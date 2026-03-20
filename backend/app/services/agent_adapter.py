@@ -128,10 +128,7 @@ def analyze_request(message: str, transcript: Optional[ParsedTranscript]) -> Str
     elif student_ref:
         profile = load_student_profile(student_ref)
 
-    if USE_ADK_WRAPPER and profile is not None:
-        # Plug your Google ADK orchestration call in here if you want the web UI to
-        # invoke the existing multi-agent flow directly instead of using the local
-        # adapter below. Keep the return value mapped into the dashboard schema.
+    if USE_ADK_WRAPPER:
         adk_result = _try_invoke_google_adk_agent(
             message=message,
             profile=profile,
@@ -205,7 +202,7 @@ def analyze_request(message: str, transcript: Optional[ParsedTranscript]) -> Str
 
 def _try_invoke_google_adk_agent(
     message: str,
-    profile: Dict[str, Any],
+    profile: Optional[Dict[str, Any]],
     target_semester: str,
     max_credits: int,
 ) -> Optional[StructuredAgentResponse]:
@@ -227,16 +224,20 @@ def _try_invoke_google_adk_agent(
             session_service=session_service,
         )
 
-        # Build a fully pre-filled message so greeting_agent completes in one shot
-        student_id = profile.get("student_id", profile.get("student_ref", "unknown"))
-        student_name = profile.get("student_name", "Student")
-        prefilled = (
-            f"Student ID: {student_id}. "
-            f"Student name: {student_name}. "
-            f"Target semester: {target_semester}. "
-            f"Max credits: {max_credits}. "
-            f"Original request: {message}"
-        )
+        # If no profile yet, pass the raw message so greeting_agent responds naturally
+        if profile is None:
+            prefilled = message
+        else:
+            # Pre-fill all fields so greeting_agent completes in one shot
+            student_id = profile.get("student_id", profile.get("student_ref", "unknown"))
+            student_name = profile.get("student_name", "Student")
+            prefilled = (
+                f"Student ID: {student_id}. "
+                f"Student name: {student_name}. "
+                f"Target semester: {target_semester}. "
+                f"Max credits: {max_credits}. "
+                f"Original request: {message}"
+            )
 
         content = genai_types.Content(
             role="user",
@@ -268,7 +269,9 @@ def _try_invoke_google_adk_agent(
                 continue
 
         if not planner_data:
-            return None
+            # Greeting or clarifying response — return agent's reply with placeholder dashboard
+            dashboard = build_placeholder_dashboard()
+            return StructuredAgentResponse(reply_text=final_text, dashboard=dashboard)
 
         # Build completed courses from profile
         course_lookup = {c["course_id"]: c for c in load_catalog_data().get("courses", [])}
