@@ -86,7 +86,15 @@ export function ChatPanel(props: ChatPanelProps) {
         <textarea
           value={draft}
           onChange={(event) => onDraftChange(event.target.value)}
-          placeholder="Ask GradPath about your next semester, graduation timeline, or upload a transcript..."
+          onKeyDown={(event) => {
+            if (event.key === 'Enter' && !event.shiftKey) {
+              event.preventDefault();
+              if (!loading && draft.trim()) {
+                event.currentTarget.form?.requestSubmit();
+              }
+            }
+          }}
+          placeholder="Ask GradPath about your next semester, graduation timeline, or upload a transcript... (Enter to send, Shift+Enter for new line)"
           rows={4}
         />
 
