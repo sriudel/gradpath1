@@ -5,9 +5,12 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
+from dotenv import load_dotenv
 
 ROOT_DIR = Path(__file__).resolve().parents[2]
 FRONTEND_DIST_DIR = ROOT_DIR / "frontend" / "dist"
+
+load_dotenv(ROOT_DIR / ".env")
 
 API_TITLE = "GradPath UI API"
 API_VERSION = "1.0.0"
