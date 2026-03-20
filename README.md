@@ -166,6 +166,19 @@ python -m venv .venv
 pip install -r requirements.txt
 ```
 
+**PowerShell note:** If `.\.venv\Scripts\Activate.ps1` gives an "execution policy" error, run this once to fix it:
+
+```powershell
+Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
+```
+
+Then re-run `.\.venv\Scripts\Activate.ps1`. Alternatively, skip activation entirely and call Python directly:
+
+```powershell
+.\.venv\Scripts\python.exe -m pip install -r requirements.txt
+.\.venv\Scripts\python.exe run_gradpath_ui.py
+```
+
 ### 2. Frontend setup
 
 ```bash
@@ -242,6 +255,33 @@ Meaning:
 - [frontend/src/App.tsx](/Users/arunr3ddy/Documents/New project/gradpath/frontend/src/App.tsx)
 - [frontend/src/components/DashboardPanel.tsx](/Users/arunr3ddy/Documents/New project/gradpath/frontend/src/components/DashboardPanel.tsx)
 - [frontend/src/components/ChatPanel.tsx](/Users/arunr3ddy/Documents/New project/gradpath/frontend/src/components/ChatPanel.tsx)
+
+## Troubleshooting
+
+### Error 429 RESOURCE_EXHAUSTED (Gemini API quota exceeded)
+
+If you see this error:
+
+```
+429 RESOURCE_EXHAUSTED: You exceeded your current quota
+Quota exceeded for metric: generativelanguage.googleapis.com/generate_content_free_tier_requests
+limit: 5, model: gemini-2.5-flash
+```
+
+**What it means:** The free tier of the Gemini API allows only **5 requests per minute** per model. You've hit that cap.
+
+**How to fix it:**
+
+| Option | Steps | Cost |
+|--------|-------|------|
+| Wait and retry | Wait ~21 seconds between requests | Free |
+| Switch model | Change model to `gemini-2.0-flash` (15 RPM free limit) in your agent files | Free |
+| Enable billing | Go to [ai.dev/rate-limit](https://ai.dev/rate-limit) and enable a paid plan (1000+ RPM) | Paid |
+| Use a new API key | Create a new project at [aistudio.google.com](https://aistudio.google.com) — each project gets its own free quota | Free |
+
+To switch models, update the `model` field in your agent files under `agents/` from `gemini-2.5-flash` to `gemini-2.0-flash`.
+
+---
 
 ## Verification Checklist
 
