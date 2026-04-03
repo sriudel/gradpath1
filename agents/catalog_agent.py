@@ -13,7 +13,7 @@ from gradpath.tools import (
 catalog_agent = LlmAgent(
     name="catalog_agent",
     description="Summarizes required courses, prerequisites, and target-term offerings.",
-    model="gemini-2.5-flash",
+    model="gemini-2.0-flash",
     tools=[load_major_planning_context],
     instruction="""
 You are the Catalog Agent for GradPath.

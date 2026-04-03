@@ -11,7 +11,7 @@ from gradpath.tools import load_student_profile
 history_agent = LlmAgent(
     name="history_agent",
     description="Summarizes completed courses, grades, and total credits earned.",
-    model="gemini-2.5-flash",
+    model="gemini-2.0-flash",
     tools=[load_student_profile],
     instruction="""
 You are the Course History Agent for GradPath.

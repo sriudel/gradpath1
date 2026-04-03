@@ -8,7 +8,7 @@ from google.adk.agents import LlmAgent
 planner_agent = LlmAgent(
     name="planner_agent",
     description="Uses compact history and catalog summaries to recommend next-semester courses.",
-    model="gemini-2.5-flash",
+    model="gemini-2.0-flash",
     instruction="""
 You are the Planning Agent for GradPath.
 

@@ -61,7 +61,7 @@ def build_chat_router(session_store: SessionStore) -> APIRouter:
         user_message = build_user_message(user_text, attachment_name=attachment_name)
 
         try:
-            analysis = analyze_request(user_text, parsed_transcript)
+            analysis = await analyze_request(user_text, parsed_transcript)
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
 

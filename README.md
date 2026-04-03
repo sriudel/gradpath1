@@ -293,3 +293,13 @@ After install/build, verify:
 - the dashboard updates only after the API responds
 - placeholder states show before any analysis
 - errors display clearly for unsupported or unparseable transcript files
+
+
+
+
+
+
+sri-run
+Gradpath % cd /Users/sri/Downloads/Gradpath
+source .venv/bin/activate
+python run_gradpath_ui.py

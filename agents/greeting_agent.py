@@ -9,7 +9,7 @@ from google.adk.agents import LlmAgent
 greeting_agent = LlmAgent(
     name="greeting_agent",
     description="Collects the student's basic planning information.",
-    model="gemini-2.5-flash",
+    model="gemini-2.0-flash",
     instruction="""
 You are the Greeting Agent for GradPath, a beginner-friendly academic planner.
 

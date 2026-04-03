@@ -100,7 +100,7 @@ def build_schema_example() -> ResponseSchemaExample:
     )
 
 
-def analyze_request(message: str, transcript: Optional[ParsedTranscript]) -> StructuredAgentResponse:
+async def analyze_request(message: str, transcript: Optional[ParsedTranscript]) -> StructuredAgentResponse:
     target_semester = _extract_target_semester(message) or DEFAULT_TARGET_SEMESTER
     max_credits = _extract_max_credits(message) or DEFAULT_MAX_CREDITS
     student_ref = _extract_student_ref(message)
@@ -129,7 +129,7 @@ def analyze_request(message: str, transcript: Optional[ParsedTranscript]) -> Str
         profile = load_student_profile(student_ref)
 
     if USE_ADK_WRAPPER:
-        adk_result = _try_invoke_google_adk_agent(
+        adk_result = await _try_invoke_google_adk_agent(
             message=message,
             profile=profile,
             target_semester=target_semester,
@@ -137,6 +137,14 @@ def analyze_request(message: str, transcript: Optional[ParsedTranscript]) -> Str
         )
         if adk_result is not None:
             return adk_result
+        # ADK is enabled but the call failed — return an error, do not fall
+        # through to the Python rule engine.
+        dashboard = build_placeholder_dashboard()
+        dashboard.progress_summary.target_semester = target_semester
+        return StructuredAgentResponse(
+            reply_text="The AI model is unavailable right now. Please try again in a moment.",
+            dashboard=dashboard,
+        )
 
     if profile is None:
         inferred_profile = _infer_profile_from_message(message)
@@ -200,7 +208,7 @@ def analyze_request(message: str, transcript: Optional[ParsedTranscript]) -> Str
     return StructuredAgentResponse(reply_text=reply_text, dashboard=dashboard)
 
 
-def _try_invoke_google_adk_agent(
+async def _try_invoke_google_adk_agent(
     message: str,
     profile: Optional[Dict[str, Any]],
     target_semester: str,
@@ -212,23 +220,23 @@ def _try_invoke_google_adk_agent(
         from google.adk.sessions import InMemorySessionService
         from google.genai import types as genai_types
         from gradpath.agent import root_agent
+        from gradpath.agents import greeting_agent
 
         session_service = InMemorySessionService()
-        session = session_service.create_session(
+        session = await session_service.create_session(
             app_name="gradpath",
             user_id="ui_user",
         )
-        runner = Runner(
-            agent=root_agent,
-            app_name="gradpath",
-            session_service=session_service,
-        )
 
-        # If no profile yet, pass the raw message so greeting_agent responds naturally
+        # If no student profile is known yet, run only the greeting_agent so it
+        # can ask for the required fields. Running the full SequentialAgent
+        # (root_agent) without a student_id causes the greeting_agent to
+        # hallucinate one and the remaining agents to produce garbage output.
         if profile is None:
+            active_agent = greeting_agent
             prefilled = message
         else:
-            # Pre-fill all fields so greeting_agent completes in one shot
+            active_agent = root_agent
             student_id = profile.get("student_id", profile.get("student_ref", "unknown"))
             student_name = profile.get("student_name", "Student")
             prefilled = (
@@ -239,13 +247,19 @@ def _try_invoke_google_adk_agent(
                 f"Original request: {message}"
             )
 
+        runner = Runner(
+            agent=active_agent,
+            app_name="gradpath",
+            session_service=session_service,
+        )
+
         content = genai_types.Content(
             role="user",
             parts=[genai_types.Part(text=prefilled)],
         )
 
         final_text = ""
-        for event in runner.run(
+        async for event in runner.run_async(
             user_id="ui_user",
             session_id=session.id,
             new_message=content,
@@ -256,10 +270,26 @@ def _try_invoke_google_adk_agent(
         if not final_text:
             return None
 
-        # Extract the last JSON block from the planner agent's response
-        json_blocks = re.findall(r"\{[\s\S]*?\}", final_text)
+        # Extract the outermost JSON object from the planner agent's response.
+        # The model may wrap it in a markdown code fence (```json ... ```).
         planner_data: Dict[str, Any] = {}
-        for block in reversed(json_blocks):
+        # Strip markdown code fences if present
+        stripped = re.sub(r"```(?:json)?\s*", "", final_text).strip()
+        # Find all top-level JSON objects by scanning for balanced braces
+        candidates: List[str] = []
+        depth = 0
+        start = -1
+        for i, ch in enumerate(stripped):
+            if ch == "{":
+                if depth == 0:
+                    start = i
+                depth += 1
+            elif ch == "}":
+                depth -= 1
+                if depth == 0 and start != -1:
+                    candidates.append(stripped[start : i + 1])
+                    start = -1
+        for block in reversed(candidates):
             try:
                 parsed = _json.loads(block)
                 if "recommended_courses" in parsed:
@@ -360,8 +390,14 @@ def _try_invoke_google_adk_agent(
         reply_text = _build_reply_text(dashboard, target_semester)
         return StructuredAgentResponse(reply_text=reply_text, dashboard=dashboard)
 
-    except Exception:
-        return None
+    except Exception as exc:
+        import traceback
+        traceback.print_exc()
+        dashboard = build_placeholder_dashboard()
+        return StructuredAgentResponse(
+            reply_text=f"GradPath AI encountered an error: {exc}",
+            dashboard=dashboard,
+        )
 
 
 def _build_dashboard_from_profile(
